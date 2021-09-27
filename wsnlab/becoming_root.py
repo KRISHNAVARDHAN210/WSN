@@ -8,7 +8,7 @@ from source import wsnlab_vis as wsn
 Roles = Enum('Roles', 'UNDISCOVERED UNREGISTERED ROOT')
 
 ###########################################################
-class MyNode(wsn.Node):
+class SensorNode(wsn.Node):
 
     ###################
     def init(self):
@@ -51,8 +51,20 @@ class MyNode(wsn.Node):
                     self.set_timer('TIMER_A', 30)
 
 
+    def createNode(self):
+        # place node
+        node = sim.add_node(SensorNode, (250, 250))
+        node.tx_range = 75
+        node.logging = True
+        return(node)
+
 ###########################################################
 sim = wsn.Simulator(
+    #TODO Create 100 nodes at random locations with random interarrival times. This will be done by creating first node and then schedule
+    #     a timer with a random expiration time (less than 10 seconds) 
+    #     Node creation should be called by the expiration of the timer  (call the timer Timer_CreateNode)
+
+
     until=100,
     timescale=0.1,
     visual=True,
@@ -60,9 +72,10 @@ sim = wsn.Simulator(
     title="Becoming Root Demo")
 
 # place node
-node = sim.add_node(MyNode, (250, 250))
-node.tx_range = 75
-node.logging = True
+# node = sim.add_node(SensorNode, (250, 250))
+# node.tx_range = 75
+# node.logging = True
+node = SensorNode.createNode(SensorNode);
 
 # start the simulation
 sim.run()
