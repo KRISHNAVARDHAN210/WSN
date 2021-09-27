@@ -51,32 +51,34 @@ class SensorNode(wsn.Node):
                     self.set_timer('TIMER_A', 30)
 
 
-    def createNode(self):
-        # place node
+###########################################################
+def createNetwork(sensorNode, numberofNodes = 10):
+    # Create number of nodes with randiim interarrival times 
+    for i in range(numberofNodes):    
         node = sim.add_node(SensorNode, (250, 250))
         node.tx_range = 75
         node.logging = True
-        return(node)
 
-###########################################################
+
 sim = wsn.Simulator(
-    #TODO Create 100 nodes at random locations with random interarrival times.  You can create all nodes at the beginnning and acivate nodes at random times
+    #TODO Create 100 nodes at random locations with random interarrival times.  You can create all nodes at the beginnning and activate nodes at random times
     # When nodes are created they appear in gray
     # Activated nodes becomes red 
-    # Connected nodes will be red.  
+    # Connected nodes will be green.
+    # Routers/Cluster Heads should be blue  
 
 
-    until=100,
-    timescale=0.1,
-    visual=True,
-    terrain_size=(700, 700),
-    title="Becoming Root Demo")
+    until=100, # simulation Duration in seconds
+    timescale=0.1, #  The real time dureation of 1 second simualtion time 
+    visual=True,    # visualization active
+    terrain_size=(700, 700),    #terrain size
+    title="Data Collection Tree") 
 
 # place node
 # node = sim.add_node(SensorNode, (250, 250))
 # node.tx_range = 75
 # node.logging = True
-node = SensorNode.createNode(SensorNode);
+
 
 # start the simulation
 sim.run()
