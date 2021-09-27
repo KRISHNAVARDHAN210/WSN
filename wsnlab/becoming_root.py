@@ -60,9 +60,10 @@ class SensorNode(wsn.Node):
 
 ###########################################################
 sim = wsn.Simulator(
-    #TODO Create 100 nodes at random locations with random interarrival times. This will be done by creating first node and then schedule
-    #     a timer with a random expiration time (less than 10 seconds) 
-    #     Node creation should be called by the expiration of the timer  (call the timer Timer_CreateNode)
+    #TODO Create 100 nodes at random locations with random interarrival times.  You can create all nodes at the beginnning and acivate nodes at random times
+    # When nodes are created they appear in gray
+    # Activated nodes becomes red 
+    # Connected nodes will be red.  
 
 
     until=100,
