@@ -8,7 +8,6 @@ import random
 import simpy
 from simpy.util import start_delayed
 
-
 ###########################################################
 class Addr:
     """Use for a network address which has two parts
@@ -19,7 +18,7 @@ class Addr:
     """
 
     ############################
-    def __init__(self, f, l):
+    def __init__(self, net_addr, node_addr):
         """Constructor for Addr class.
 
            Args:
@@ -29,8 +28,8 @@ class Addr:
            Returns:
                Addr: Created Addr object.
         """
-        self.f = f
-        self.l = l
+        self.net_addr = net_addr
+        self.node_addr = node_addr
 
     ############################
     def __eq__(self, other):
@@ -42,7 +41,7 @@ class Addr:
            Returns:
                bool: returns True if the objects are equal, otherwise False.
         """
-        if self.f == other.f and self.l == other.l:
+        if self.net_addr == other.net_addr and self.node_addr == other.node_addr:
             return True
         return False
 
@@ -56,7 +55,7 @@ class Addr:
            Returns:
                bool: returns True if the objects are equal, otherwise False.
         """
-        if self.f == other.f and self.l == other.l:
+        if self.net_addr == other.net_addr and self.node_addr == other.node_addr:
             return True
         return False
 
@@ -64,6 +63,7 @@ class Addr:
 BROADCAST_ADDR = Addr(255, 255)
 """Addr: Keeps broadcast address.
 """
+
 
 
 ###########################################################
@@ -361,14 +361,14 @@ class Simulator:
        Attributes:
            timescale (double): Seconds in real time for 1 second in simulation. It arranges speed of simulation
            nodes (List of Node): Nodes in network.
-           until (double): Duration of simulation.
+           duration (double): Duration of simulation.
            random (Random): Random object to use.
            timeout (Function): Timeout Function.
 
     """
 
     ############################
-    def __init__(self, until, timescale=1, seed=0):
+    def __init__(self, duration, timescale=1, seed=0):
         """Constructor for Simulator class.
 
            Args:
@@ -379,12 +379,9 @@ class Simulator:
            Returns:
                Simulator: Created Simulator object.
         """
-        if timescale > 0:
-            self.env = simpy.rt.RealtimeEnvironment(factor=timescale, strict=False)
-        else:
-            self.env = simpy.Environment()
+        self.env = simpy.rt.RealtimeEnvironment(factor=timescale, strict=False)
         self.nodes = []
-        self.until = until
+        self.duration = duration
         self.timescale = timescale
         self.random = random.Random(seed)
         self.timeout = self.env.timeout
@@ -417,7 +414,7 @@ class Simulator:
         start_delayed(self.env, func, delay=delay)
 
     ############################
-    def add_node(self, nodeclass, pos):
+    def add_node(self, node_class, pos, *args, **kwargs):
         """Adds a new node in to network.
 
            Args:
@@ -427,7 +424,7 @@ class Simulator:
                 nodeclass object: Created nodeclass object
         """
         id = len(self.nodes)
-        node = nodeclass(self, id, pos)
+        node = node_class(self, id, pos)
         self.nodes.append(node)
         self.update_neighbor_list(id)
         return node
@@ -482,6 +479,6 @@ class Simulator:
             n.init()
         for n in self.nodes:
             self.env.process(ensure_generator(self.env, n.run))
-        self.env.run(until=self.until)
+        self.env.run(until=self.duration)
         for n in self.nodes:
             n.finish()

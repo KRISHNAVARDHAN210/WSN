@@ -96,11 +96,11 @@ class Simulator(wsnlab.Simulator):
         terrain_size (Tuple(double,double)): Size of visualised terrain.
     '''
 
-    def __init__(self, until, timescale=1, seed=0, terrain_size=(500, 500), visual=True, title=None):
+    def __init__(self, duration, timescale=1, seed=0, terrain_size=(500, 500), visual=True, title=None):
         """Constructor for visualised Simulator class.
 
            Args:
-               until (double): Duration of simulation.
+               duration (double): Duration of simulation.
                timescale (double): Seconds in real time for 1 second in simulation. It arranges speed of simulation
                seed (double): seed for Random bbject.
                terrain_size (Tuple(double,double)): Size of visualised terrain.
@@ -110,7 +110,7 @@ class Simulator(wsnlab.Simulator):
            Returns:
                Simulator: Created Simulator object.
         """
-        super().__init__(until, timescale, seed)
+        super().__init__(duration, timescale, seed)
         self.visual = visual
         self.terrain_size = terrain_size
         if self.visual:

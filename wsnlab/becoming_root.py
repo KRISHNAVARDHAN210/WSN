@@ -52,10 +52,10 @@ class SensorNode(wsn.Node):
 
 
 ###########################################################
-def createNetwork(sensorNode, numberofNodes = 10):
+def createNetwork(node_class, number_of_nodes = 10):
     # Create number of nodes with randiim interarrival times 
-    for i in range(numberofNodes):    
-        node = sim.add_node(SensorNode, (250, 250))
+    for i in range(number_of_nodes):
+        node = sim.add_node(node_class, (250, 250))
         node.tx_range = 75
         node.logging = True
 
@@ -71,16 +71,16 @@ sim = wsn.Simulator(
     # this is priyanka
 
 
-    until=100, # simulation Duration in seconds
+    duration=100, # simulation Duration in seconds
     timescale=0.1, #  The real time dureation of 1 second simualtion time 
     visual=True,    # visualization active
     terrain_size=(700, 700),    #terrain size
     title="Data Collection Tree") 
 
 # place node
-# node = sim.add_node(SensorNode, (250, 250))
-# node.tx_range = 75
-# node.logging = True
+node = sim.add_node(SensorNode, (250, 250))
+node.tx_range = 75
+node.logging = True
 
 
 # start the simulation
