@@ -7,7 +7,7 @@ from source import wsnlab_vis as wsn
 import math
 
 
-Roles = Enum('Roles', 'UNDISCOVERED UNREGISTERED ROOT REGISTERED')
+Roles = Enum('Roles', 'UNDISCOVERED UNREGISTERED ROOT REGISTERED CLUSTER_HEAD')
 """Enumeration of roles"""
 
 ###########################################################
@@ -37,11 +37,15 @@ class SensorNode(wsn.Node):
         self.sleep()
         self.addr = None
         self.ch_addr = None
+        self.parent_addr = None
+        self.root_addr = None
         self.role = Roles.UNDISCOVERED
         self.is_root_eligible = True if self.id == 45 else False
         self.c_probe = 0  # c means counter and probe is the name of counter
         self.th_probe = 10  # th means threshold and probe is the name of threshold
         self.received_HB_addresses = []  # keeps received HB message addresses
+        self.received_JR_guis = []  # keeps received Join Request global unique ids
+        self.routing_table = {}  # keeps routing information
 
     ###################
     def run(self):
@@ -90,7 +94,8 @@ class SensorNode(wsn.Node):
     ###################
     def send_join_reply(self, gui, addr):
         """Sending join reply message to register the node requested to join.
-        The message includes a gui to determine which node will take this reply and an addr to be assigned to the node.
+        The message includes a gui to determine which node will take this reply, an addr to be assigned to the node
+        and a root_addr.
 
         Args:
             gui (int): Global unique ID
@@ -98,7 +103,8 @@ class SensorNode(wsn.Node):
         Returns:
 
         """
-        self.send({'dest': wsn.BROADCAST_ADDR, 'type': 'JOIN_REPLY', 'source': self.addr, 'gui': gui, 'addr': addr})
+        self.send({'dest': wsn.BROADCAST_ADDR, 'type': 'JOIN_REPLY', 'source': self.ch_addr,
+                   'gui': gui, 'addr': addr, 'root_addr': self.root_addr})
 
     ###################
     def send_join_ack(self, dest):
@@ -112,6 +118,51 @@ class SensorNode(wsn.Node):
         self.send({'dest': dest, 'type': 'JOIN_ACK', 'source': self.addr})
 
     ###################
+    def route_and_forward_package(self, pck):
+        """Routing and forwarding given package
+
+        Args:
+            pck (Dict): package to route and forward
+        Returns:
+
+        """
+        if self.ch_addr is None:
+            pck['prev_hop'] = self.addr
+            pck['next_hop'] = self.parent_addr
+        elif pck['dest'].net_addr == self.ch_addr.net_addr:
+            pck['prev_hop'] = self.ch_addr
+            pck['next_hop'] = pck['dest']
+        else:
+            pck['next_hop'] = self.routing_table[pck['dest'].net_addr]
+            if self.role != Roles.ROOT and pck['next_hop'].is_equal(self.parent_addr):
+                pck['prev_hop'] = self.addr
+            else:
+                pck['prev_hop'] = self.ch_addr
+        self.send(pck)
+
+    ###################
+    def send_network_request(self):
+        """Sending network request message to root address to be cluster head
+
+        Args:
+
+        Returns:
+
+        """
+        self.route_and_forward_package({'dest': self.root_addr, 'type': 'NETWORK_REQUEST', 'source': self.addr})
+
+    ###################
+    def send_network_reply(self, dest, addr):
+        """Sending network request message to root address to be cluster head
+
+        Args:
+
+        Returns:
+
+        """
+        self.route_and_forward_package({'dest': dest, 'type': 'NETWORK_REPLY', 'source': self.addr, 'addr': addr})
+
+    ###################
     def on_receive(self, pck):
         """Executes when a package received.
 
@@ -120,14 +171,43 @@ class SensorNode(wsn.Node):
         Returns:
 
         """
-        if self.role == Roles.ROOT:  # if the node is root
+        if self.role == Roles.ROOT or self.role == Roles.CLUSTER_HEAD:  # if the node is root or cluster head
+            if 'next_hop' in pck.keys() and pck['dest'] != self.addr and pck['dest'] != self.ch_addr:
+                self.routing_table[pck['source'].net_addr] = pck['prev_hop']
+                self.log('forwarding'+str(pck))
+                self.route_and_forward_package(pck)
+                return
             if pck['type'] == 'PROBE':  # it waits and sends heart beat message once received probe message
                 yield self.timeout(.5)
                 self.send_heart_beat()
             if pck['type'] == 'JOIN_REQUEST':  # it waits and sends join reply message once received join request
+                yield self.timeout(.5)
+                self.send_join_reply(pck['gui'], wsn.Addr(self.ch_addr.net_addr, pck['gui']))
+            if pck['type'] == 'NETWORK_REQUEST':
                 self.log(pck)
                 yield self.timeout(.5)
-                self.send_join_reply(pck['gui'], wsn.Addr(self.addr.net_addr, pck['gui']))
+                if self.role == Roles.ROOT:
+                    new_addr = wsn.Addr(pck['source'].node_addr,254)
+                    self.routing_table[new_addr.net_addr] = pck['prev_hop']
+                    self.send_network_reply(pck['source'],new_addr)
+
+        elif self.role == Roles.REGISTERED:
+            if pck['type'] == 'PROBE':
+                yield self.timeout(.5)
+                self.send_heart_beat()
+            if pck['type'] == 'JOIN_REQUEST':
+                self.received_JR_guis.append(pck['gui'])
+                yield self.timeout(.5)
+                self.send_network_request()
+            if pck['type'] == 'NETWORK_REPLY':
+                self.log(pck)
+                self.role = Roles.CLUSTER_HEAD
+                self.scene.nodecolor(self.id, 0, 0, 1)
+                self.ch_addr = pck['addr']
+                self.routing_table[self.root_addr.net_addr] = pck['prev_hop']
+                for gui in self.received_JR_guis:
+                    yield self.timeout(random.uniform(.5,.1))
+                    self.send_join_reply(gui, wsn.Addr(self.ch_addr.net_addr,gui))
 
         elif self.role == Roles.UNDISCOVERED:  # if the node is undiscovered
             if pck['type'] == 'HEART_BEAT':  # it kills probe timer, becomes unregistered and sets join request timer once received heart beat
@@ -140,17 +220,17 @@ class SensorNode(wsn.Node):
 
         if self.role == Roles.UNREGISTERED:  # if the node is unregistered
             if pck['type'] == 'HEART_BEAT':  # it stores the address of the heart beat message once received heart beat
-                self.log(pck)
                 self.received_HB_addresses.append(pck['source'])
             if pck['type'] == 'JOIN_REPLY':  # it becomes registered and sends join ack if the message is sent to itself once received join reply
-                self.log(pck)
                 if pck['gui'] == self.id:
                     self.addr = pck['addr']
                     self.role = Roles.REGISTERED
                     self.scene.nodecolor(self.id, 0, 1, 0)
                     self.parent_addr = pck['source']
+                    self.root_addr = pck['root_addr']
                     self.draw_parent(pck['source'])
                     self.kill_timer('TIMER_JOIN_REQUEST')
+                    self.set_timer('TIMER_HEART_BEAT', 15)
                     yield self.timeout(.5)
                     self.send_join_ack(pck['source'])
 
@@ -179,8 +259,9 @@ class SensorNode(wsn.Node):
                 if self.is_root_eligible:  # if the node is root eligible, it becomes root
                     self.role = Roles.ROOT
                     self.scene.nodecolor(self.id, 0, 0, 1)
-                    self.addr = wsn.Addr(1, 254)
-                    self.ch_addr = wsn.Addr(1, 254)
+                    self.addr = wsn.Addr(self.id, 254)
+                    self.ch_addr = wsn.Addr(self.id, 254)
+                    self.root_addr = self.addr
                     self.set_timer('TIMER_HEART_BEAT', 15)
                 else:  # otherwise it keeps trying to sending probe after a long time
                     self.c_probe = 0
@@ -216,14 +297,14 @@ def create_network(node_class, number_of_nodes=100):
         px = 50 + x * 60 + random.uniform(-20, 20)
         py = 50 + y * 60 + random.uniform(-20, 20)
         node = sim.add_node(node_class, (px, py))
-        node.tx_range = 75
+        node.tx_range = 150
         node.logging = True
         node.arrival = random.uniform(0, 50)
 
 
 sim = wsn.Simulator(
-    duration=100, # simulation Duration in seconds
-    timescale=0.1, #  The real time dureation of 1 second simualtion time
+    duration=1000, # simulation Duration in seconds
+    timescale=0.00001, #  The real time dureation of 1 second simualtion time
     visual=True,    # visualization active
     terrain_size=(700, 700),    #terrain size
     title="Data Collection Tree") 

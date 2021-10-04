@@ -188,15 +188,16 @@ class Node:
             print(f"Node {'#' + str(self.id):4}[{self.now:10.5f}] {msg}")
 
     ############################
-    def can_receive(self, dest):
-        """Checks if the given destination address is proper to receive package.
+    def can_receive(self, pck):
+        """Checks if the given package is proper to receive.
 
            Args:
-               dest (Addr): An Addr object to check.
+               pck (Dict): A package to check.
 
            Returns:
-               bool: returns True if the given destination address is proper to receive message.
+               bool: returns True if the given package is proper to receive .
         """
+        dest = pck['next_hop'] if 'next_hop' in pck.keys() else pck['dest']
         if dest.is_equal(BROADCAST_ADDR):  # if destination address is broadcast address
             return True
         if self.addr is not None:  # if node's address is assigned
@@ -222,7 +223,7 @@ class Node:
         """
         for (dist, node) in self.neighbor_distance_list:
             if dist <= self.tx_range:
-                if node.can_receive(pck['dest']):
+                if node.can_receive(pck):
                     prop_time = dist / 1000000 - 0.00001 if dist / 1000000 - 0.00001 >0 else 0.00001
                     self.delayed_exec(prop_time, node.on_receive_check, pck)
             else:

@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="092e8846-0231-4152-8f06-0c599685202c" name="Changes" comment="Draw parent bug fixed">
+    <list default="true" id="092e8846-0231-4152-8f06-0c599685202c" name="Changes" comment="idea added to git ignore">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/wsnlab/data_collection_tree.py" beforeDir="false" afterPath="$PROJECT_DIR$/wsnlab/data_collection_tree.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wsnlab/source/wsnlab.py" beforeDir="false" afterPath="$PROJECT_DIR$/wsnlab/source/wsnlab.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +67,8 @@
       <workItem from="1632800927182" duration="354000" />
       <workItem from="1632850395123" duration="13881000" />
       <workItem from="1632887086424" duration="1521000" />
-      <workItem from="1632948755696" duration="6861000" />
+      <workItem from="1632948755696" duration="12546000" />
+      <workItem from="1633365141734" duration="10582000" />
     </task>
     <task id="LOCAL-00001" summary="Variable names are arranged">
       <created>1632851830563</created>
@@ -123,7 +126,21 @@
       <option name="project" value="LOCAL" />
       <updated>1632955819248</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="__repr__ function added to Addr class">
+      <created>1632956026444</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1632956026444</updated>
+    </task>
+    <task id="LOCAL-00010" summary="idea added to git ignore">
+      <created>1632956155344</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1632956155344</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -150,10 +167,12 @@
     <MESSAGE value="Parent visualization added" />
     <MESSAGE value="Draw parent is improved" />
     <MESSAGE value="Draw parent bug fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="Draw parent bug fixed" />
+    <MESSAGE value="__repr__ function added to Addr class" />
+    <MESSAGE value="idea added to git ignore" />
+    <option name="LAST_COMMIT_MESSAGE" value="idea added to git ignore" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/EE662Fall2021$becoming_root.coverage" NAME="data_collection_tree Coverage Results" MODIFIED="1632874752414" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
-    <SUITE FILE_PATH="coverage/EE662Fall2021$data_collection_tree.coverage" NAME="data_collection_tree Coverage Results" MODIFIED="1632955869583" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
+    <SUITE FILE_PATH="coverage/EE662Fall2021$data_collection_tree.coverage" NAME="data_collection_tree Coverage Results" MODIFIED="1633375892740" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
   </component>
 </project>
