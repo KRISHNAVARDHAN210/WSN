@@ -131,6 +131,7 @@ dmypy.json
 # env files
 idea
 .idea/
+.idea/workspace.xml
 idea/*
 .idea/*
 .idea\workspace.xml
