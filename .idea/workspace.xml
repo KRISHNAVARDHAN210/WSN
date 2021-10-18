@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="092e8846-0231-4152-8f06-0c599685202c" name="Changes" comment="nodes send their sensor values to the root">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="092e8846-0231-4152-8f06-0c599685202c" name="Changes" comment="hop_count">
       <change beforePath="$PROJECT_DIR$/wsnlab/source/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/wsnlab/source/config.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -130,7 +129,7 @@
       <workItem from="1634166402843" duration="1823000" />
       <workItem from="1634324088839" duration="1280000" />
       <workItem from="1634368572952" duration="1308000" />
-      <workItem from="1634585478804" duration="4376000" />
+      <workItem from="1634585478804" duration="4683000" />
     </task>
     <task id="LOCAL-00001" summary="Variable names are arranged">
       <created>1632851830563</created>
@@ -258,7 +257,14 @@
       <option name="project" value="LOCAL" />
       <updated>1634166442933</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="hop_count">
+      <created>1634598518963</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1634598518963</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -292,12 +298,13 @@
     <MESSAGE value="comments added" />
     <MESSAGE value="gitignore updated" />
     <MESSAGE value="nodes send their sensor values to the root" />
-    <option name="LAST_COMMIT_MESSAGE" value="nodes send their sensor values to the root" />
+    <MESSAGE value="hop_count" />
+    <option name="LAST_COMMIT_MESSAGE" value="hop_count" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/EE662Fall2021$example.coverage" NAME="example Coverage Results" MODIFIED="1633462351918" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
     <SUITE FILE_PATH="coverage/EE662Fall2021$becoming_root.coverage" NAME="data_collection_tree Coverage Results" MODIFIED="1632874752414" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
-    <SUITE FILE_PATH="coverage/EE662Fall2021$data_collection_tree2.coverage" NAME="data_collection_tree2 Coverage Results" MODIFIED="1634589366466" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
+    <SUITE FILE_PATH="coverage/EE662Fall2021$data_collection_tree2.coverage" NAME="data_collection_tree2 Coverage Results" MODIFIED="1634598628502" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
     <SUITE FILE_PATH="coverage/EE662Fall2021$data_collection_tree.coverage" NAME="data_collection_tree Coverage Results" MODIFIED="1633997898198" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/wsnlab" />
   </component>
 </project>
