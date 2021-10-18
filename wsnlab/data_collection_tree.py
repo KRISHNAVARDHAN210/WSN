@@ -122,7 +122,7 @@ class SensorNode(wsn.Node):
         """Routing and forwarding given package
 
         Args:
-            pck (Dict): package to route and forward
+            pck (Dict): package to route and forward it should contain dest, source and type.
         Returns:
 
         """
@@ -176,7 +176,6 @@ class SensorNode(wsn.Node):
         if self.role == Roles.ROOT or self.role == Roles.CLUSTER_HEAD:  # if the node is root or cluster head
             if 'next_hop' in pck.keys() and pck['dest'] != self.addr and pck['dest'] != self.ch_addr:  # forwards message if destination is not itself
                 self.routing_table[pck['source'].net_addr] = pck['prev_hop']
-                self.log('forwarding'+str(pck))
                 self.route_and_forward_package(pck)
                 return
             if pck['type'] == 'PROBE':  # it waits and sends heart beat message once received probe message
@@ -186,12 +185,13 @@ class SensorNode(wsn.Node):
                 yield self.timeout(.5)
                 self.send_join_reply(pck['gui'], wsn.Addr(self.ch_addr.net_addr, pck['gui']))
             if pck['type'] == 'NETWORK_REQUEST':  # it sends a network reply to requested node
-                self.log(pck)
                 yield self.timeout(.5)
                 if self.role == Roles.ROOT:
                     new_addr = wsn.Addr(pck['source'].node_addr,254)
                     self.routing_table[new_addr.net_addr] = pck['prev_hop']
                     self.send_network_reply(pck['source'],new_addr)
+            if pck['type'] == 'SENSOR':
+                self.log(str(pck['source'])+'--'+str(pck['sensor_value']))
 
         elif self.role == Roles.REGISTERED:  # if the node is registered
             if pck['type'] == 'PROBE':
@@ -202,7 +202,6 @@ class SensorNode(wsn.Node):
                 yield self.timeout(.5)
                 self.send_network_request()
             if pck['type'] == 'NETWORK_REPLY':  # it becomes cluster head and send join reply to the candidates
-                self.log(pck)
                 self.role = Roles.CLUSTER_HEAD
                 self.scene.nodecolor(self.id, 0, 0, 1)
                 self.ch_addr = pck['addr']
@@ -235,6 +234,10 @@ class SensorNode(wsn.Node):
                     self.set_timer('TIMER_HEART_BEAT', 15)
                     yield self.timeout(.5)
                     self.send_join_ack(pck['source'])
+
+                    timer_duration =  self.id % 20
+                    if timer_duration == 0: timer_duration = 1
+                    self.set_timer('TIMER_SENSOR', timer_duration)
 
     ###################
     def on_timer_fired(self, name, *args, **kwargs):
@@ -280,6 +283,12 @@ class SensorNode(wsn.Node):
             else:  # otherwise it chose one of them and sends join request
                 self.send_join_request(random.choice(self.received_HB_addresses))
                 self.set_timer('TIMER_JOIN_REQUEST', 5)
+
+        elif name == 'TIMER_SENSOR':
+            self.route_and_forward_package({'dest': self.root_addr, 'type': 'SENSOR', 'source': self.addr, 'sensor_value': random.uniform(10,50)})
+            timer_duration =  self.id % 20
+            if timer_duration == 0: timer_duration = 1
+            self.set_timer('TIMER_SENSOR', timer_duration)
 
 
 ROOT_ID = random.randint(0, config.SIM_NODE_COUNT)
