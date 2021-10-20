@@ -67,7 +67,7 @@ class Node(wsnlab.Node):
                x (double): x of position.
                y (double): y of position.
 
-           Returns:
+           Returns:neighbor_death_detection.py
 
         """
         super().move(x, y)
