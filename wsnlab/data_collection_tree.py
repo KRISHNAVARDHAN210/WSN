@@ -2,7 +2,7 @@ import random
 from enum import Enum
 import sys
 # insert at 1, 0 is the script path (or '' in REPL)
-sys.path.insert(1, '.\source\\')
+sys.path.insert(1, '..\source')
 from source import wsnlab_vis as wsn
 import math
 from source import config
