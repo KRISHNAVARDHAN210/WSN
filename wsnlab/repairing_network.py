@@ -17,7 +17,7 @@ class SensorNode(wsn.Node):
 
     Attributes:
         role (Roles): role of node
-        is_root_eligible (bool): keeps eligibility to be root
+        is_root_eligible (bool): eligibility to be root
         c_probe (int): probe message counter
         th_probe (int): probe message threshold
         neighbors_table (Dict): keeps the neighbor information with received heart beat messages
@@ -52,7 +52,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def run(self):
-        """Setting the arrival timer to wake up after firing.
+        """Setting the arrival timer to wake up and dead timer to die.
 
         Args:
 
@@ -68,6 +68,13 @@ class SensorNode(wsn.Node):
 
     ###################
     def become_unregistered(self):
+        """ Resets all necessary variables to be unregistered and becomes unregistered.
+
+        Args:
+
+        Returns:
+
+        """
         if self.role != Roles.UNDISCOVERED:
             self.kill_all_timers()
             self.log('I became UNREGISTERED')
@@ -91,6 +98,13 @@ class SensorNode(wsn.Node):
 
     ###################
     def update_neighbor(self, pck):
+        """Updates neighbor, child_network, members and candidate parent tables with incoming heartbeat package.
+
+        Args:
+            pck (Dict): heartbeat package
+        Returns:
+
+        """
         pck['arrival_time'] = self.now
         self.neighbors_table[pck['gui']] = pck
         if pck['gui'] not in self.child_networks_table.keys() or pck['gui'] not in self.members_table:
@@ -102,6 +116,14 @@ class SensorNode(wsn.Node):
 
     ###################
     def check_neighbors(self):
+        """Checks neighbors if they are still alive or not. If not, updates necessary tables.
+        Sends heartbeat and network update messages in need.
+
+        Args:
+
+        Returns:
+
+        """
         childs_updated = False
         parent_dead = False
         will_be_removed = []
@@ -129,6 +151,13 @@ class SensorNode(wsn.Node):
 
     ###################
     def select_and_join(self):
+        """Choses the node with minimum hop count to the root (on tie, minimum gui) and send a join request message.
+
+        Args:
+
+        Returns:
+
+        """
         min_hop = 99999
         min_hop_gui = 99999
         for gui in self.candidate_parents_table:
@@ -141,6 +170,13 @@ class SensorNode(wsn.Node):
 
     ###################
     def repair(self):
+        """Executes chosen repairing instructions.
+
+        Args:
+
+        Returns:
+
+        """
         if self.role == Roles.REGISTERED:
             self.become_unregistered()
         else:
@@ -151,11 +187,25 @@ class SensorNode(wsn.Node):
 
     ###################
     def repair_all_orphan(self):
+        """Becomes unregistered and sends I am orphan message.
+
+        Args:
+
+        Returns:
+
+        """
         self.send_i_am_orphan()
         self.become_unregistered()
 
     ###################
     def repair_find_another_parent(self):
+        """If it has potential parent in its table, tries to connect any of them. Otherwise becomes unregistered.
+
+        Args:
+
+        Returns:
+
+        """
         if self.parent_gui in self.candidate_parents_table:
             self.candidate_parents_table.remove(self.parent_gui)
             del self.neighbors_table[self.parent_gui]
@@ -171,7 +221,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_i_am_orphan(self):
-        """Sending i am orphan message to be discovered and registered.
+        """Sends i am orphan message to inform its neighbors.
 
         Args:
 
@@ -184,7 +234,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_probe(self):
-        """Sending probe message to be discovered and registered.
+        """Sends probe message to be discovered and registered.
 
         Args:
 
@@ -195,7 +245,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_heart_beat(self):
-        """Sending heart beat message
+        """Sends heart beat message
 
         Args:
 
@@ -213,7 +263,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_join_request(self, dest):
-        """Sending join request message to given destination address to join destination network
+        """Sends join request message to given destination address to join destination network
 
         Args:
             dest (Addr): Address of destination node
@@ -224,7 +274,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_join_reply(self, gui, addr):
-        """Sending join reply message to register the node requested to join.
+        """Sends join reply message to register the node requested to join.
         The message includes a gui to determine which node will take this reply, an addr to be assigned to the node
         and a root_addr.
 
@@ -240,7 +290,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_join_ack(self, dest):
-        """Sending join acknowledgement message to given destination address.
+        """Sends join acknowledgement message to given destination address.
 
         Args:
             dest (Addr): Address of destination node
@@ -252,7 +302,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def route_and_forward_package(self, pck):
-        """Routing and forwarding given package
+        """Routes and forwards given package
 
         Args:
             pck (Dict): package to route and forward it should contain dest, source and type.
@@ -274,7 +324,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_network_request(self):
-        """Sending network request message to root address to be cluster head
+        """Sends network request message to root address to be cluster head
 
         Args:
 
@@ -285,7 +335,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_network_reply(self, dest, addr):
-        """Sending network reply message to dest address to be cluster head with a new adress
+        """Sends network reply message to dest address to be cluster head with a new adress
 
         Args:
             dest (Addr): destination address
@@ -298,7 +348,7 @@ class SensorNode(wsn.Node):
 
     ###################
     def send_network_update(self):
-        """Sending network update message to parent
+        """Sends network update message to parent
 
         Args:
 
@@ -325,26 +375,23 @@ class SensorNode(wsn.Node):
             if 'next_hop' in pck.keys() and pck['dest'] != self.addr and pck['dest'] != self.ch_addr:  # forwards message if destination is not itself
                 self.route_and_forward_package(pck)
                 return
-            if pck['type'] == 'HEART_BEAT':
+            if pck['type'] == 'HEART_BEAT':  # updates neighbor information and relations
                 self.update_neighbor(pck)
-            if pck['type'] == 'PROBE':  # it waits and sends heart beat message once received probe message
-                # yield self.timeout(.5)
+            if pck['type'] == 'PROBE':  # it sends heart beat message
                 self.send_heart_beat()
-            if pck['type'] == 'JOIN_REQUEST':  # it waits and sends join reply message once received join request
-                # yield self.timeout(.5)
+            if pck['type'] == 'JOIN_REQUEST':  # it and sends join reply message once received join request
                 self.send_join_reply(pck['gui'], wsn.Addr(self.ch_addr.net_addr, pck['gui']))
             if pck['type'] == 'NETWORK_REQUEST':  # it sends a network reply to requested node
-                # yield self.timeout(.5)
                 if self.role == Roles.ROOT:
                     new_addr = wsn.Addr(pck['source'].node_addr,254)
                     self.send_network_reply(pck['source'],new_addr)
-            if pck['type'] == 'JOIN_ACK':
+            if pck['type'] == 'JOIN_ACK':  # updates members table
                 self.members_table.append(pck['gui'])
-            if pck['type'] == 'NETWORK_UPDATE':
+            if pck['type'] == 'NETWORK_UPDATE':  # updates child networks table and sends network update message
                 self.child_networks_table[pck['gui']] = pck['child_networks']
                 if self.role != Roles.ROOT:
                     self.send_network_update()
-            if pck['type'] == 'I_AM_ORPHAN':
+            if pck['type'] == 'I_AM_ORPHAN':  # if the sender is parent, starts repairing procedure
                 if pck['gui'] == self.parent_gui:
                     self.repair()
             if pck['type'] == 'SENSOR':
@@ -352,31 +399,27 @@ class SensorNode(wsn.Node):
                 # self.log(str(pck['source'])+'--'+str(pck['sensor_value']))
 
         elif self.role == Roles.REGISTERED:  # if the node is registered
-            if pck['type'] == 'HEART_BEAT':
+            if pck['type'] == 'HEART_BEAT':  # updates neighbor information and relations
                 self.update_neighbor(pck)
-            if pck['type'] == 'PROBE':
-                # yield self.timeout(.5)
+            if pck['type'] == 'PROBE':  # it sends heart beat message
                 self.send_heart_beat()
             if pck['type'] == 'JOIN_REQUEST':  # it sends a network request to the root
                 self.received_JR_guis.append(pck['gui'])
-                # yield self.timeout(.5)
                 self.send_network_request()
             if pck['type'] == 'NETWORK_REPLY':  # it becomes cluster head and send join reply to the candidates
                 self.role = Roles.CLUSTER_HEAD
                 self.scene.nodecolor(self.id, 0, 0, 1)
                 self.ch_addr = pck['addr']
                 self.send_network_update()
-                # yield self.timeout(.5)
                 self.send_heart_beat()
                 for gui in self.received_JR_guis:
-                    # yield self.timeout(random.uniform(.1,.5))
                     self.send_join_reply(gui, wsn.Addr(self.ch_addr.net_addr,gui))
-            if pck['type'] == 'I_AM_ORPHAN':
+            if pck['type'] == 'I_AM_ORPHAN':  # if the sender is parent, starts repairing procedure
                 if pck['gui'] == self.parent_gui:
                     self.repair()
 
         elif self.role == Roles.UNDISCOVERED:  # if the node is undiscovered
-            if pck['type'] == 'HEART_BEAT':  # it kills probe timer, becomes unregistered and sets join request timer once received heart beat
+            if pck['type'] == 'HEART_BEAT':  # it kills probe timer, becomes unregistered and sets join request timer
                 self.update_neighbor(pck)
                 self.kill_timer('TIMER_PROBE')
                 self.become_unregistered()
@@ -384,7 +427,7 @@ class SensorNode(wsn.Node):
         if self.role == Roles.UNREGISTERED:  # if the node is unregistered
             if pck['type'] == 'HEART_BEAT':
                 self.update_neighbor(pck)
-            if pck['type'] == 'JOIN_REPLY':  # it becomes registered and sends join ack if the message is sent to itself once received join reply
+            if pck['type'] == 'JOIN_REPLY':  # becomes registered and sends join ack if the message is sent to itself
                 if pck['dest_gui'] == self.id:
                     self.addr = pck['addr']
                     self.parent_gui = pck['gui']
@@ -395,7 +438,7 @@ class SensorNode(wsn.Node):
                     self.send_heart_beat()
                     self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
                     self.send_join_ack(pck['source'])
-                    if self.ch_addr is not None: # it could be a cluster head which lost its parent
+                    if self.ch_addr is not None:  # if it is in repairing phase
                         self.role = Roles.CLUSTER_HEAD
                         self.send_network_update()
                     else:
@@ -436,7 +479,7 @@ class SensorNode(wsn.Node):
                     self.root_addr = self.addr
                     self.hop_count = 0
                     self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
-                else:  # otherwise it keeps trying to sending probe after a long time
+                else:  # otherwise it keeps trying to sends probe after a long time
                     self.c_probe = 0
                     self.set_timer('TIMER_PROBE', 30)
 
@@ -446,7 +489,7 @@ class SensorNode(wsn.Node):
         elif name == 'TIMER_JOIN_REQUEST':  # if it has not received heart beat messages before, it sets timer again and wait heart beat messages once join request timer fired.
             self.check_neighbors()
             if len(self.candidate_parents_table) == 0:
-                if self.ch_addr is not None:
+                if self.ch_addr is not None: # if it has a cluster head address. (if it is in repairing phase)
                     self.send_i_am_orphan()
                 self.become_unregistered()
             else:  # otherwise it chose one of them and sends join request
