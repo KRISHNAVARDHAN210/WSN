@@ -1,11 +1,26 @@
 import random
 from enum import Enum
 import sys
-# insert at 1, 0 is the script path (or '' in REPL)
 sys.path.insert(1, '.')
 from source import wsnlab_vis as wsn
 import math
 from source import config
+from collections import Counter
+
+
+import csv  # <— add this near your other imports
+
+# Track where each node is placed
+NODE_POS = {}  # {node_id: (x, y)}
+
+# --- tracking containers ---
+ALL_NODES = []              # node objects
+CLUSTER_HEADS = []
+ROLE_COUNTS = Counter()     # live tally per Roles enum
+
+def _addr_str(a): return "" if a is None else str(a)
+def _role_name(r): return r.name if hasattr(r, "name") else str(r)
+
 
 Roles = Enum('Roles', 'UNDISCOVERED UNREGISTERED ROOT REGISTERED CLUSTER_HEAD')
 """Enumeration of roles"""
@@ -39,7 +54,7 @@ class SensorNode(wsn.Node):
         self.ch_addr = None
         self.parent_gui = None
         self.root_addr = None
-        self.role = Roles.UNDISCOVERED
+        self.set_role(Roles.UNDISCOVERED)
         self.is_root_eligible = True if self.id == ROOT_ID else False
         self.c_probe = 0  # c means counter and probe is the name of counter
         self.th_probe = 10  # th means threshold and probe is the name of threshold
@@ -62,6 +77,36 @@ class SensorNode(wsn.Node):
         self.set_timer('TIMER_ARRIVAL', self.arrival)
 
     ###################
+
+    def set_role(self, new_role, *, recolor=True):
+        """Central place to switch roles, keep tallies, and (optionally) recolor."""
+        old_role = getattr(self, "role", None)
+        if old_role is not None:
+            ROLE_COUNTS[old_role] -= 1
+            if ROLE_COUNTS[old_role] <= 0:
+                ROLE_COUNTS.pop(old_role, None)
+        ROLE_COUNTS[new_role] += 1
+        self.role = new_role
+
+        if recolor:
+            if new_role == Roles.UNDISCOVERED:
+                self.scene.nodecolor(self.id, 1, 1, 1)
+            elif new_role == Roles.UNREGISTERED:
+                self.scene.nodecolor(self.id, 1, 1, 0)
+            elif new_role == Roles.REGISTERED:
+                self.scene.nodecolor(self.id, 0, 1, 0)
+            elif new_role == Roles.CLUSTER_HEAD:
+                self.scene.nodecolor(self.id, 0, 0, 1)
+                self.draw_tx_range()
+            elif new_role == Roles.ROOT:
+                self.scene.nodecolor(self.id, 0, 0, 0)
+                self.set_timer('TIMER_EXPORT_CH_CSV', config.EXPORT_CH_CSV_INTERVAL)
+                self.set_timer('TIMER_EXPORT_NEIGHBOR_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
+
+
+
+
+    
     def become_unregistered(self):
         if self.role != Roles.UNDISCOVERED:
             self.kill_all_timers()
@@ -72,7 +117,7 @@ class SensorNode(wsn.Node):
         self.ch_addr = None
         self.parent_gui = None
         self.root_addr = None
-        self.role = Roles.UNREGISTERED
+        self.set_role(Roles.UNREGISTERED)
         self.c_probe = 0
         self.th_probe = 10
         self.hop_count = 99999
@@ -87,7 +132,13 @@ class SensorNode(wsn.Node):
     ###################
     def update_neighbor(self, pck):
         pck['arrival_time'] = self.now
+        # compute Euclidean distance between self and neighbor
+        if pck['gui'] in NODE_POS and self.id in NODE_POS:
+            x1, y1 = NODE_POS[self.id]
+            x2, y2 = NODE_POS[pck['gui']]
+            pck['distance'] = math.hypot(x1 - x2, y1 - y2)
         self.neighbors_table[pck['gui']] = pck
+
         if pck['gui'] not in self.child_networks_table.keys() or pck['gui'] not in self.members_table:
             if pck['gui'] not in self.candidate_parents_table:
                 self.candidate_parents_table.append(pck['gui'])
@@ -282,7 +333,11 @@ class SensorNode(wsn.Node):
                 # yield self.timeout(.5)
                 self.send_network_request()
             if pck['type'] == 'NETWORK_REPLY':  # it becomes cluster head and send join reply to the candidates
-                self.role = Roles.CLUSTER_HEAD
+                self.set_role(Roles.CLUSTER_HEAD)
+                try:
+                    write_clusterhead_distances_csv("clusterhead_distances.csv")
+                except Exception as e:
+                    self.log(f"CH CSV export error: {e}")
                 self.scene.nodecolor(self.id, 0, 0, 1)
                 self.ch_addr = pck['addr']
                 self.send_network_update()
@@ -313,11 +368,10 @@ class SensorNode(wsn.Node):
                     self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
                     self.send_join_ack(pck['source'])
                     if self.ch_addr is not None: # it could be a cluster head which lost its parent
-                        self.role = Roles.CLUSTER_HEAD
+                        self.set_role(Roles.CLUSTER_HEAD)
                         self.send_network_update()
                     else:
-                        self.role = Roles.REGISTERED
-                        self.scene.nodecolor(self.id, 0, 1, 0)
+                        self.set_role(Roles.REGISTERED)
                     # # sensor implementation
                     # timer_duration =  self.id % 20
                     # if timer_duration == 0: timer_duration = 1
@@ -346,7 +400,7 @@ class SensorNode(wsn.Node):
                 self.set_timer('TIMER_PROBE', 1)
             else:  # if the counter reached the threshold
                 if self.is_root_eligible:  # if the node is root eligible, it becomes root
-                    self.role = Roles.ROOT
+                    self.set_role(Roles.ROOT)
                     self.scene.nodecolor(self.id, 0, 0, 0)
                     self.addr = wsn.Addr(self.id, 254)
                     self.ch_addr = wsn.Addr(self.id, 254)
@@ -360,6 +414,7 @@ class SensorNode(wsn.Node):
         elif name == 'TIMER_HEART_BEAT':  # it sends heart beat message once heart beat timer fired
             self.send_heart_beat()
             self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
+            #print(self.id)
 
         elif name == 'TIMER_JOIN_REQUEST':  # if it has not received heart beat messages before, it sets timer again and wait heart beat messages once join request timer fired.
             if len(self.candidate_parents_table) == 0:
@@ -372,14 +427,134 @@ class SensorNode(wsn.Node):
             timer_duration =  self.id % 20
             if timer_duration == 0: timer_duration = 1
             self.set_timer('TIMER_SENSOR', timer_duration)
+        elif name == 'TIMER_EXPORT_CH_CSV':
+            # Only root should drive exports (cheap guard)
+            if self.role == Roles.ROOT:
+                write_clusterhead_distances_csv("clusterhead_distances.csv")
+                # reschedule
+                self.set_timer('TIMER_EXPORT_CH_CSV', config.EXPORT_CH_CSV_INTERVAL)
+        elif name == 'TIMER_EXPORT_NEIGHBOR_CSV':
+            if self.role == Roles.ROOT:
+                write_neighbor_distances_csv("neighbor_distances.csv")
+                self.set_timer('TIMER_EXPORT_NEIGHBOR_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
 
 
 
+ROOT_ID = random.randrange(config.SIM_NODE_COUNT)  # 0..count-1
 
 
 
-ROOT_ID = random.randint(0, config.SIM_NODE_COUNT)
+def write_node_distances_csv(path="node_distances.csv"):
+    """Write pairwise node-to-node Euclidean distances as an edge list."""
+    ids = sorted(NODE_POS.keys())
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["source_id", "target_id", "distance"])
+        for i, sid in enumerate(ids):
+            x1, y1 = NODE_POS[sid]
+            for tid in ids[i+1:]:  # i+1 to avoid duplicates and self-pairs
+                x2, y2 = NODE_POS[tid]
+                dist = math.hypot(x1 - x2, y1 - y2)
+                w.writerow([sid, tid, f"{dist:.6f}"])
 
+
+def write_node_distance_matrix_csv(path="node_distance_matrix.csv"):
+    ids = sorted(NODE_POS.keys())
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["node_id"] + ids)
+        for sid in ids:
+            x1, y1 = NODE_POS[sid]
+            row = [sid]
+            for tid in ids:
+                x2, y2 = NODE_POS[tid]
+                dist = math.hypot(x1 - x2, y1 - y2)
+                row.append(f"{dist:.6f}")
+            w.writerow(row)
+
+
+def write_clusterhead_distances_csv(path="clusterhead_distances.csv"):
+    """Write pairwise distances between current cluster heads."""
+    clusterheads = []
+    for node in sim.nodes:
+        # Only collect nodes that are cluster heads and have recorded positions
+        if hasattr(node, "role") and node.role == Roles.CLUSTER_HEAD and node.id in NODE_POS:
+            x, y = NODE_POS[node.id]
+            clusterheads.append((node.id, x, y))
+
+    if len(clusterheads) < 2:
+        # Still write the header so the file exists/is refreshed
+        with open(path, "w", newline="") as f:
+            csv.writer(f).writerow(["clusterhead_1", "clusterhead_2", "distance"])
+        return
+
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["clusterhead_1", "clusterhead_2", "distance"])
+        for i, (id1, x1, y1) in enumerate(clusterheads):
+            for id2, x2, y2 in clusterheads[i+1:]:
+                dist = math.hypot(x1 - x2, y1 - y2)
+                w.writerow([id1, id2, f"{dist:.6f}"])
+
+
+
+def write_neighbor_distances_csv(path="neighbor_distances.csv", dedupe_undirected=True):
+    """
+    Export neighbor distances per node.
+    Each row is (node -> neighbor) with distance from NODE_POS.
+
+    Args:
+        path (str): output CSV path
+        dedupe_undirected (bool): if True, writes each unordered pair once
+                                  (min(node_id,neighbor_id), max(...)).
+                                  If False, writes one row per direction.
+    """
+    # Safety: ensure we can compute distances
+    if not globals().get("NODE_POS"):
+        raise RuntimeError("NODE_POS is missing; record positions during create_network().")
+
+    # Prepare a set to avoid duplicates if dedupe_undirected=True
+    seen_pairs = set()
+
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["node_id", "neighbor_id", "distance",
+                    "neighbor_role", "neighbor_hop_count", "arrival_time"])
+
+        for node in sim.nodes:
+            # Skip nodes without any neighbor info yet
+            if not hasattr(node, "neighbors_table"):
+                continue
+
+            x1, y1 = NODE_POS.get(node.id, (None, None))
+            if x1 is None:
+                continue  # no position → cannot compute distance
+
+            # neighbors_table: key = neighbor GUI, value = heartbeat packet dict
+            for n_gui, pck in getattr(node, "neighbors_table", {}).items():
+                # Optional dedupe (unordered)
+                if dedupe_undirected:
+                    key = (min(node.id, n_gui), max(node.id, n_gui))
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+
+                # Position of neighbor
+                x2, y2 = NODE_POS.get(n_gui, (None, None))
+                if x2 is None:
+                    continue
+
+                # Distance (prefer pck['distance'] if you added it in update_neighbor)
+                dist = pck.get("distance")
+                if dist is None:
+                    dist = math.hypot(x1 - x2, y1 - y2)
+
+                # Extra fields (best-effort; may be missing)
+                n_role = getattr(pck.get("role", None), "name", pck.get("role", None))
+                hop = pck.get("hop_count", "")
+                at  = pck.get("arrival_time", "")
+
+                w.writerow([node.id, n_gui, f"{dist:.6f}", n_role, hop, at])
 
 ###########################################################
 def create_network(node_class, number_of_nodes=100):
@@ -395,10 +570,11 @@ def create_network(node_class, number_of_nodes=100):
     for i in range(number_of_nodes):
         x = i / edge
         y = i % edge
-        px = 50 + x * config.SIM_NODE_PLACING_CELL_SIZE + random.uniform(-1 * config.SIM_NODE_PLACING_CELL_SIZE / 3, config.SIM_NODE_PLACING_CELL_SIZE / 3)
-        py = 50 + y * config.SIM_NODE_PLACING_CELL_SIZE + random.uniform(-1 * config.SIM_NODE_PLACING_CELL_SIZE / 3, config.SIM_NODE_PLACING_CELL_SIZE / 3)
+        px = 300 + config.SCALE*x * config.SIM_NODE_PLACING_CELL_SIZE + random.uniform(-1 * config.SIM_NODE_PLACING_CELL_SIZE / 3, config.SIM_NODE_PLACING_CELL_SIZE / 3)
+        py = 200 + config.SCALE* y * config.SIM_NODE_PLACING_CELL_SIZE + random.uniform(-1 * config.SIM_NODE_PLACING_CELL_SIZE / 3, config.SIM_NODE_PLACING_CELL_SIZE / 3)
         node = sim.add_node(node_class, (px, py))
-        node.tx_range = config.NODE_TX_RANGE
+        NODE_POS[node.id] = (px, py)   # <— add this line
+        node.tx_range = config.NODE_TX_RANGE * config.SCALE
         node.logging = True
         node.arrival = random.uniform(0, config.NODE_ARRIVAL_MAX)
         if node.id == ROOT_ID:
@@ -415,8 +591,13 @@ sim = wsn.Simulator(
 # creating random network
 create_network(SensorNode, config.SIM_NODE_COUNT)
 
+write_node_distances_csv("node_distances.csv")
+write_node_distance_matrix_csv("node_distance_matrix.csv")
+
 # start the simulation
 sim.run()
+print("Simulation Finished")
+
 
 # Created 100 nodes at random locations with random arrival times.
 # When nodes are created they appear in white

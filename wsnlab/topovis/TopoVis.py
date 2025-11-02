@@ -2,6 +2,8 @@ from time import sleep, time as systime
 from threading import Timer
 from heapq import heappush, heappop
 import inspect
+import functools
+
 
 from .common import *
 
@@ -52,34 +54,30 @@ class GenericPlotter:
     def textstyle(self,id,**kwargs): pass
 
 ###############################################
+
 def informPlotters(_func_):
     """
     Invoke the instance method of the same name inside each of the registered
-    plotters 
+    plotters
     """
+    orig_sig = inspect.signature(_func_)
+
+    @functools.wraps(_func_)  # preserves __name__, __doc__, etc.
     def _wrap_(self, *args, **kwargs):
+        # keep original behavior: do not return the wrapped function's result
         _func_(self, *args, **kwargs)
+
+        # match original semantics: raise AttributeError if plotter lacks method
         for plotter in self.plotters:
             plotter_func = getattr(plotter, _func_.__name__)
             plotter_func(*args, **kwargs)
 
-    # code snippet for preserving function's name, doc, and signature
-    # (from http://numericalrecipes.wordpress.com/2009/05/25/signature-preserving-function-decorators/)
-    sig = list(inspect.getargspec(_func_))
-    wrap_sig = list(inspect.getargspec(_wrap_))
-    if not sig[2] :
-        sig[2] = wrap_sig[2]
-    src =  'def %s%s :\n' %(_func_.__name__, inspect.formatargspec(*sig))
-    sig[3] = None # if not, all vars with defaults are set to default value
-    src += '    return _wrap_%s\n' % (inspect.formatargspec(*sig))
-    evaldict = {'_wrap_' : _wrap_}
-    code = compile(src, '<string>', 'single')
-    #exec code in evaldict  # Python2
-    exec(code,evaldict)  # Python3
-    ret = evaldict[_func_.__name__]
-    ret.__doc__ = _func_.__doc__
-    return ret
+        # explicit None to reflect original (no return)
+        return None
 
+    # make help() / IDEs show the original function signature
+    _wrap_.__signature__ = orig_sig
+    return _wrap_
 ###############################################
 class Scene:
     """

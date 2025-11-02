@@ -1,5 +1,13 @@
 import random
-import wsnsimpy.wsnsimpy_tk as wsp
+import os, sys
+import random
+from enum import Enum
+import sys
+# insert at 1, 0 is the script path (or '' in REPL)
+sys.path.insert(1, '.')
+from source import wsnlab_vis as wsp
+import math
+from source import config
 
 SOURCE = 1
 DEST   = 99

@@ -41,12 +41,18 @@ class Node(wsnlab.Node):
            Returns:
 
         """
-        obj_id = self.scene.circle(
-            self.pos[0], self.pos[1],
-            self.tx_range,
-            line="wsnsimpy:tx")
+        # UNcomment for Radio Circles 
+
+        #obj_id = self.scene.circle(
+        #    self.pos[0], self.pos[1],
+        #    self.tx_range,
+        #    line="wsnsimpy:tx")
+        
         super().send(pck)
-        self.delayed_exec(0.2, self.scene.delshape, obj_id)
+        
+        #Uncomment for Radio Circles 
+        #self.delayed_exec(0.2, self.scene.delshape, obj_id)
+        
         # When unicast is added, it needs to be re-arranged
         # if not pck['dest'].is_equal(wsnlab.BROADCAST_ADDR):
         #     destPos = self.sim.nodes[pck['dest'].l].pos
@@ -57,6 +63,21 @@ class Node(wsnlab.Node):
         #     self.delayed_exec(0.2,self.scene.delshape,obj_id)
 
     ###################
+
+
+    def draw_tx_range(self):
+        """Draws transmission range of the node.
+
+           Args:
+
+           Returns:
+
+        """
+        obj_id =self.scene.circle(self.pos[0], self.pos[1], self.tx_range, line="wsnsimpy:tx")
+        #self.delayed_exec(0.2, self.scene.delshape, obj_id)
+
+
+
     def move(self, x, y):
         """Visualise move process in addition to base move method.
 
@@ -116,7 +137,7 @@ class Simulator(wsnlab.Simulator):
         terrain_size (Tuple(double,double)): Size of visualised terrain.
     '''
 
-    def __init__(self, duration, timescale=1, seed=0, terrain_size=(500, 500), visual=True, title=None):
+    def __init__(self, duration, timescale=1, seed=0, terrain_size=(1000, 1000), visual=True, title=None):
         """Constructor for visualised Simulator class.
 
            Args:
