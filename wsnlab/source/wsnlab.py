@@ -473,7 +473,7 @@ class Simulator:
            Returns:
                 nodeclass object: Created nodeclass object
         """
-        id = len(self.nodes)
+        id = len(self.nodes) 
         node = node_class(self, id, pos)
         self.nodes.append(node)
         self.update_neighbor_list(id)

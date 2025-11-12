@@ -5,6 +5,7 @@ sys.path.insert(1, '.')
 from source import wsnlab_vis as wsn
 import math
 from source import config
+from source.addressing import next_short_addr
 from collections import Counter
 
 
@@ -40,30 +41,39 @@ class SensorNode(wsn.Node):
 
     ###################
     def init(self):
-        """Initialization of node. Setting all attributes of node.
-        At the beginning node needs to be sleeping and its role should be UNDISCOVERED.
-
-        Args:
-
-        Returns:
-
-        """
-        self.scene.nodecolor(self.id, 1, 1, 1) # sets self color to white
+        self.scene.nodecolor(self.id, 1, 1, 1)
         self.sleep()
-        self.addr = None
         self.ch_addr = None
         self.parent_gui = None
         self.root_addr = None
-        self.set_role(Roles.UNDISCOVERED)
-        self.is_root_eligible = True if self.id == ROOT_ID else False
-        self.c_probe = 0  # c means counter and probe is the name of counter
-        self.th_probe = 10  # th means threshold and probe is the name of threshold
-        self.hop_count = 99999
-        self.neighbors_table = {}  # keeps neighbor information with received HB messages
+
+        if (self.id) == config.ROOT_ID:
+            self.addr = wsn.Addr(config.NETWORK_ID, config.ROOT_SHORT_ADDR)
+            self.root_addr = self.addr
+            self.ch_addr   = self.addr
+            self.set_role(Roles.ROOT)
+            self.hop_count = 0
+            self.scene.nodecolor(self.id, 0, 0, 0)
+            print(f"[ROOT] Node {self.id} initialized as ROOT with addr {self.addr}")
+        else:
+            self.addr = next_short_addr()  # <-- already a wsn.Addr
+            self.set_role(Roles.UNDISCOVERED)
+            self.hop_count = 99999
+            print(f"[NODE] Node {self.id} initialized with addr {self.addr}")
+
+        self.is_root_eligible = ((self.id) == config.ROOT_ID)
+        self.c_probe = 0
+        self.th_probe = 10
+        self.neighbors_table = {}
         self.candidate_parents_table = []
         self.child_networks_table = {}
-        self.members_table = []
-        self.received_JR_guis = []  # keeps received Join Request global unique ids
+        self.members_table = []          
+        self.received_JR_guis = []
+        self.multi_neighbors = {}      
+        self._share_seq = 0           
+        self._seen_share = {}         
+        if getattr(config, "NEIGHBOR_SHARE_MAX_HOPS", 1) > 1:
+         self.set_timer('TIMER_NEIGHBOR_SHARE', config.NEIGHBOR_SHARE_INTERVAL)
 
     ###################
     def run(self):
@@ -87,6 +97,13 @@ class SensorNode(wsn.Node):
                 ROLE_COUNTS.pop(old_role, None)
         ROLE_COUNTS[new_role] += 1
         self.role = new_role
+        try:
+            self.kill_timer('TIMER_HEART_BEAT')
+        except Exception:
+            pass
+
+        if new_role in (Roles.ROOT, Roles.CLUSTER_HEAD):
+            self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
 
         if recolor:
             if new_role == Roles.UNDISCOVERED:
@@ -102,11 +119,8 @@ class SensorNode(wsn.Node):
                 self.scene.nodecolor(self.id, 0, 0, 0)
                 self.set_timer('TIMER_EXPORT_CH_CSV', config.EXPORT_CH_CSV_INTERVAL)
                 self.set_timer('TIMER_EXPORT_NEIGHBOR_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
+                self.set_timer('TIMER_EXPORT_MULTIHOP_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
 
-
-
-
-    
     def become_unregistered(self):
         if self.role != Roles.UNDISCOVERED:
             self.kill_all_timers()
@@ -225,6 +239,86 @@ class SensorNode(wsn.Node):
                    'gui': self.id})
 
     ###################
+    def _now(self):  # tiny helper
+        return getattr(self, "now", 0)
+    
+    def build_neighbor_summary(self):
+        """
+        Return our current view of neighbors up to K hops:
+        - 1-hop neighbors from neighbors_table as hop=1
+        - multi-hop entries from self.multi_neighbors as their stored hop
+        This is our distance-to-target. Receiver will add +1.
+        """
+        summary = {}
+        for n_gui, p in self.neighbors_table.items():
+            summary[n_gui] = 1
+        for t_gui, meta in self.multi_neighbors.items():
+            h = meta.get("hop", 99999)
+            if h <= config.NEIGHBOR_SHARE_MAX_HOPS:
+                if t_gui not in summary or h < summary[t_gui]:
+                    summary[t_gui] = h
+        summary.pop(self.id, None)
+        return [{"gui": gid, "hop": hop} for gid, hop in summary.items()]
+    
+    def send_neighbor_share(self):
+        """Broadcast our neighbor summary periodically."""
+        self._share_seq += 1
+        payload = {
+            "dest": wsn.BROADCAST_ADDR,
+            "type": "NEIGHBOR_SHARE",
+            "from_gui": self.id,
+            "seq": self._share_seq,
+            "items": self.build_neighbor_summary(),  
+        }
+        self.send(payload)
+
+    def merge_neighbor_share(self, pck):
+        """
+        Merge a received NEIGHBOR_SHARE into our multi-hop table.
+        The sender’s hop value is distance from sender; for us it's +1.
+        We track the best (smallest-hop) path and 'via' (the sender).
+        """
+        sender = pck.get("from_gui")
+        if sender is None:
+            return
+
+        # dedupe on sequence per sender
+        seq = pck.get("seq")
+        last = self._seen_share.get(sender, -1)
+        if seq is not None and seq <= last:
+            return
+        self._seen_share[sender] = seq
+
+        items = pck.get("items", [])
+        now = self._now()
+
+        for it in items:
+            tgt = it.get("gui")
+            h_sender = it.get("hop", 99999)
+            if tgt is None:
+                continue
+            if tgt == self.id:
+                continue  # ignore ourselves
+
+            # our distance = sender's distance + 1
+            h_here = h_sender + 1
+            if h_here > config.NEIGHBOR_SHARE_MAX_HOPS:
+                continue
+
+            best = self.multi_neighbors.get(tgt)
+            if best is None or h_here < best["hop"] or (h_here == best["hop"] and best.get("via", 1e9) > sender):
+                self.multi_neighbors[tgt] = {"hop": h_here, "via": sender, "last_seen": now}
+
+    def cleanup_stale_neighbors(self):
+        """Drop stale multi-hop entries that haven't been refreshed recently."""
+        now = self._now()
+        stale = []
+        for tgt, meta in self.multi_neighbors.items():
+            if (now - meta.get("last_seen", 0)) > config.NEIGHBOR_STALE_TIME:
+                stale.append(tgt)
+        for tgt in stale:
+            self.multi_neighbors.pop(tgt, None)                
+    
     def route_and_forward_package(self, pck):
         """Routing and forwarding given package
 
@@ -295,18 +389,44 @@ class SensorNode(wsn.Node):
         Returns:
 
         """
+        if pck.get("type") == "NEIGHBOR_SHARE":
+            # First, ensure we consider the sender as a 1-hop neighbor if we see their share
+                if "from_gui" in pck:
+                    gui_sender = pck["from_gui"]
+                    if gui_sender not in self.neighbors_table and self.id in NODE_POS and gui_sender in NODE_POS:
+                        # create a minimal 1-hop record (optional, helps bootstrapping)
+                        x1, y1 = NODE_POS[self.id]
+                        x2, y2 = NODE_POS[gui_sender]
+                        self.neighbors_table[gui_sender] = {
+                            "type": "HEART_BEAT",
+                            "gui": gui_sender,
+                            "addr": None,
+                            "ch_addr": None,
+                            "hop_count": 1e6,  # unknown
+                            "arrival_time": self.now,
+                            "distance": math.hypot(x1 - x2, y1 - y2),
+                        }
+                self.merge_neighbor_share(pck)
+                return
         if self.role == Roles.ROOT or self.role == Roles.CLUSTER_HEAD:  # if the node is root or cluster head
             if 'next_hop' in pck.keys() and pck['dest'] != self.addr and pck['dest'] != self.ch_addr:  # forwards message if destination is not itself
                 self.route_and_forward_package(pck)
                 return
             if pck['type'] == 'HEART_BEAT':
-                self.update_neighbor(pck)
+                self.update_neighbor(pck) 
             if pck['type'] == 'PROBE':  # it waits and sends heart beat message once received probe message
                 # yield self.timeout(.5)
                 self.send_heart_beat()
             if pck['type'] == 'JOIN_REQUEST':  # it waits and sends join reply message once received join request
                 # yield self.timeout(.5)
-                self.send_join_reply(pck['gui'], wsn.Addr(self.ch_addr.net_addr, pck['gui']))
+                current_children = len(self.members_table)
+                if current_children < config.MAX_CHILDREN_PER_CLUSTER:
+                    net = (self.ch_addr.net_addr if self.ch_addr is not None else self.addr.net_addr)
+                    new_addr = wsn.Addr(net, pck['gui'])
+                    self.send_join_reply(pck['gui'], new_addr)
+                else:
+                    self.scene.nodecolor(self.id, 0.5, 0, 1)
+                    self.log(f"Cluster head {self.id} full ({current_children}/{config.MAX_CHILDREN_PER_CLUSTER}). Ignored JOIN_REQUEST from node {pck['gui']}.")
             if pck['type'] == 'NETWORK_REQUEST':  # it sends a network reply to requested node
                 # yield self.timeout(.5)
                 if self.role == Roles.ROOT:
@@ -393,21 +513,21 @@ class SensorNode(wsn.Node):
             self.wake_up()
             self.set_timer('TIMER_PROBE', 1)
 
-        elif name == 'TIMER_PROBE':  # it sends probe if counter didn't reach the threshold once timer probe fired.
+        elif name == 'TIMER_PROBE':
             if self.c_probe < self.th_probe:
                 self.send_probe()
                 self.c_probe += 1
                 self.set_timer('TIMER_PROBE', 1)
-            else:  # if the counter reached the threshold
-                if self.is_root_eligible:  # if the node is root eligible, it becomes root
+            else:
+                if self.is_root_eligible:
                     self.set_role(Roles.ROOT)
                     self.scene.nodecolor(self.id, 0, 0, 0)
-                    self.addr = wsn.Addr(self.id, 254)
-                    self.ch_addr = wsn.Addr(self.id, 254)
+                    self.addr = wsn.Addr(config.NETWORK_ID, 254)  # (1,254)
+                    self.ch_addr = self.addr
                     self.root_addr = self.addr
                     self.hop_count = 0
                     self.set_timer('TIMER_HEART_BEAT', config.HEARTH_BEAT_TIME_INTERVAL)
-                else:  # otherwise it keeps trying to sending probe after a long time
+                else:
                     self.c_probe = 0
                     self.set_timer('TIMER_PROBE', 30)
 
@@ -437,10 +557,14 @@ class SensorNode(wsn.Node):
             if self.role == Roles.ROOT:
                 write_neighbor_distances_csv("neighbor_distances.csv")
                 self.set_timer('TIMER_EXPORT_NEIGHBOR_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
-
-
-
-ROOT_ID = random.randrange(config.SIM_NODE_COUNT)  # 0..count-1
+        elif name == 'TIMER_NEIGHBOR_SHARE':
+            self.send_neighbor_share()
+            self.set_timer('TIMER_NEIGHBOR_SHARE', config.NEIGHBOR_SHARE_INTERVAL)
+        elif name == 'TIMER_EXPORT_MULTIHOP_CSV':
+            if self.role == Roles.ROOT:
+                write_multihop_csv("multihop_neighbors.csv")
+                self.set_timer('TIMER_EXPORT_MULTIHOP_CSV', config.EXPORT_NEIGHBOR_CSV_INTERVAL)
+    
 
 
 
@@ -495,6 +619,23 @@ def write_clusterhead_distances_csv(path="clusterhead_distances.csv"):
             for id2, x2, y2 in clusterheads[i+1:]:
                 dist = math.hypot(x1 - x2, y1 - y2)
                 w.writerow([id1, id2, f"{dist:.6f}"])
+
+def write_multihop_csv(path="multihop_neighbors.csv"):
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["node_id", "target_gui", "hop", "via_gui", "last_seen"])
+
+        for node in sim.nodes:
+            # If we're in 1-hop mode, include direct neighbors as hop=1
+            if getattr(config, "NEIGHBOR_SHARE_MAX_HOPS", 1) == 1:
+                for tgt in getattr(node, "neighbors_table", {}).keys():
+                    w.writerow([node.id, tgt, 1, tgt, ""])
+
+            # Always include multi-hop map (will be empty when K=1)
+            for tgt, meta in getattr(node, "multi_neighbors", {}).items():
+                w.writerow([node.id, tgt, meta.get("hop"),
+                            meta.get("via"), f"{meta.get('last_seen', 0):.3f}"])
+
 
 
 
@@ -577,7 +718,7 @@ def create_network(node_class, number_of_nodes=100):
         node.tx_range = config.NODE_TX_RANGE * config.SCALE
         node.logging = True
         node.arrival = random.uniform(0, config.NODE_ARRIVAL_MAX)
-        if node.id == ROOT_ID:
+        if node.id == config.ROOT_ID:
             node.arrival = 0.1
 
 
