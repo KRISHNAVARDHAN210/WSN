@@ -1,7 +1,7 @@
 from source import wsnlab_vis as wsn
 from . import config
 
-_NEXT_SHORT_ADDR = 1  # 1,2,3,... (skip 254 root and 255 broadcast)
+_NEXT_SHORT_ADDR = 1
 
 def next_short_addr():
     """Return the next address as a wsn.Addr(net, short)."""

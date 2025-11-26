@@ -6,29 +6,45 @@ ROOT_ID = 1
 NETWORK_ID = 1
 ROOT_SHORT_ADDR = 254
 BROADCAST_ADDR = 255 
-MAX_CHILDREN_PER_CLUSTER = 5
+MAX_CHILDREN_PER_CLUSTER = 8
 NEIGHBOR_SHARE_MAX_HOPS = 3
-NEIGHBOR_SHARE_INTERVAL = 5
+NEIGHBOR_SHARE_INTERVAL = 20
+E_TX_BASE = 1.1        
+E_TX_DIST_COEFF = 0.01
+E_RX_BASE = 0.5
+def LOCAL_MESH_MAX_HOPS() -> int:
+    return 6
+NEIGHBOR_STALE_TIME = 600
+TX_DBM_MIN = 0
+TX_RANGE_BASE = 100
+TX_RANGE_SCALE_PER_6DB = 2
+CH_MIN_SEPARATION_FACTOR = 0.3
+CH_PROMOTION_DBM = 9
+CH_SEPARATION_MODE = "candidate"
+CH_DENY_COOLDOWN = 8
+ROOT_TX_DBM = 9
+CH_DEBUG_LOG = True
 
-
-## node properties
-NODE_TX_RANGE = 100  # transmission range of nodes
-NODE_ARRIVAL_MAX = 200  # max time to wake up
-
-
-## simulation properties
+PACKET_LOSS_PROB = 1e-4 
+ENABLE_PACKET_TRACING = False
+PREFER_TREE_TO_ROOT = False
+METRICS_EXPORT_INTERVAL = 30 
+NODE_ARRIVAL_MAX = 100  
 SIM_NODE_COUNT = 100  # noce count in simulation
-SIM_NODE_PLACING_CELL_SIZE = 75  # cell size to place one node
-SIM_DURATION = 5000  # simulation Duration in seconds
+SIM_NODE_PLACING_CELL_SIZE = 60  # cell size to place one node
+SIM_DURATION = 1500 # simulation Duration in seconds
 SIM_TIME_SCALE = 0.00001  #  The real time dureation of 1 second simualtion time
-SIM_TERRAIN_SIZE = (1400, 1400)  #terrain size
+SIM_TERRAIN_SIZE = (1200, 1200)  #terrain size
 SIM_TITLE = 'Data Collection Tree'  # title of visualization window
 SIM_VISUALIZATION = True  # visualization active
-SCALE = 1  # scale factor for visualization
+SCALE = 1 # scale factor for visualization
+ROUTER_MIN_CLUSTER_HEADS = 3   
+ROUTER_EVAL_INTERVAL = 120 
+CLUSTER_TX_DBM = 6
 
 
 ## application properties
-HEARTH_BEAT_TIME_INTERVAL = 100
+HEARTH_BEAT_TIME_INTERVAL = 150
 REPAIRING_METHOD = 'FIND_ANOTHER_PARENT' # 'ALL_ORPHAN', 'FIND_ANOTHER_PARENT'
-EXPORT_CH_CSV_INTERVAL = 10  # simulation time units;
-EXPORT_NEIGHBOR_CSV_INTERVAL = 10  # simulation time units;
+EXPORT_CH_CSV_INTERVAL = 100  # simulation time units;
+EXPORT_NEIGHBOR_CSV_INTERVAL = 100  # simulation time units;
