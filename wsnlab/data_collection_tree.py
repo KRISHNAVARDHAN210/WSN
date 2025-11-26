@@ -1226,7 +1226,9 @@ class SensorNode(wsn.Node):
 
         elif name == 'TIMER_SENSOR':
             if not self.neighbors_table and not self.multi_neighbors:
-                self.set_timer('TIMER_SENSOR', self.id % 20 or 1)
+                period = getattr(config, "BASE_SENSOR_PERIOD", 40) + \
+                random.uniform(0, getattr(config, "SENSOR_JITTER", 10))
+                self.set_timer('TIMER_SENSOR', period)
                 return
 
             one_hop_targets = [g for g in self.neighbors_table.keys() if g != self.id]
